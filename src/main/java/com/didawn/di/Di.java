@@ -1,12 +1,15 @@
 package com.didawn.di;
 
 import com.didawn.Constants;
-import com.eclipsesource.json.Json;
-import com.eclipsesource.json.JsonArray;
-import com.eclipsesource.json.JsonObject;
-import com.eclipsesource.json.JsonValue;
+import com.didawn.json.Alternative;
+import com.didawn.json.Data;
+import com.didawn.json.Error;
+import com.didawn.json.Response;
+import com.didawn.json.Results;
+import com.didawn.json.SearchResponse;
 import com.didawn.models.ArtistList;
 import com.didawn.models.Song;
+import com.google.gson.Gson;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -22,6 +25,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -42,15 +46,15 @@ import org.apache.http.util.EntityUtils;
 public class Di {
 
     private static final Logger log = Logger.getLogger(Di.class.getName());
+    private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36";
     public static Header[] browserHeaders;
-    private static String userAgent = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36";
     private static HttpClient httpClient;
     private static String oldToken;
     private static String apiToken;
 
     public Di() {
         ArrayList browserHeadersList = new ArrayList();
-        browserHeadersList.add(new BasicHeader("User-Agent", userAgent));
+        browserHeadersList.add(new BasicHeader("User-Agent", USER_AGENT));
         browserHeadersList.add(new BasicHeader("Content-Language", "en-US"));
         browserHeadersList.add(new BasicHeader("Cache-Control", "max-age=0"));
         browserHeadersList.add(new BasicHeader("Accept", "*/*"));
@@ -65,12 +69,14 @@ public class Di {
     }
 
     public static String get(String url, List headers) {
+        log.log(Level.INFO, "GET : {0}", new Object[]{url});
+
         String responseContent = null;
         HttpEntity httpEntity = null;
 
         try {
             HttpGet httpGet = new HttpGet(url);
-            httpGet.setHeader("User-Agent", userAgent);
+            httpGet.setHeader("User-Agent", USER_AGENT);
             if (headers != null) {
                 Header[] headersArr = new Header[headers.size()];
                 httpGet.setHeaders((Header[]) headers.toArray(headersArr));
@@ -99,14 +105,15 @@ public class Di {
             } catch (IOException var17) {
                 var17.printStackTrace();
             }
-
         }
 
         String newToken = StringUtils.substringBetween(responseContent, "var checkForm", ";");
         if (newToken != null) {
             while (true) {
-                if (!newToken.startsWith("\"") && !newToken.startsWith("'") && !newToken.startsWith("=") && !newToken.startsWith(" ")) {
-                    while (newToken.endsWith("\"") || newToken.endsWith("'") || newToken.endsWith("=") || newToken.endsWith(" ")) {
+                if (!newToken.startsWith("\"") && !newToken.startsWith("'") && !newToken.startsWith("=") && !newToken.startsWith(
+                        " ")) {
+                    while (newToken.endsWith("\"") || newToken.endsWith("'") || newToken.endsWith("=") || newToken.endsWith(
+                            " ")) {
                         newToken = newToken.substring(0, newToken.length() - 1);
                     }
 
@@ -125,12 +132,14 @@ public class Di {
     }
 
     public static String post(String url, String data, List headers) {
+        log.log(Level.INFO, "POST : {0}", new Object[]{url});
+
         String responseContent = null;
         HttpEntity httpEntity = null;
 
         try {
             HttpPost httpPost = new HttpPost(url);
-            httpPost.setHeader("User-Agent", userAgent);
+            httpPost.setHeader("User-Agent", USER_AGENT);
             if (headers != null) {
                 Header[] headersArr = new Header[headers.size()];
                 httpPost.setHeaders((Header[]) headers.toArray(headersArr));
@@ -162,7 +171,8 @@ public class Di {
         }
 
         if (responseContent != null && responseContent.contains("VALID_TOKEN_REQUIRED")) {
-            get("http://www." + Constants.dawnDotCom() + "/", Arrays.asList(browserHeaders));
+            String invalidTokenUrl = "http://www." + Constants.dawnDotCom() + "/";
+            get(invalidTokenUrl, Arrays.asList(browserHeaders));
             return post(url.replace(oldToken, apiToken), data, headers);
         } else {
             return responseContent;
@@ -228,156 +238,180 @@ public class Di {
         }
     }
 
-    private static String getString(JsonValue badString) {
-        try {
-            return badString.asString();
-        } catch (Exception var2) {
-            return badString.toString().replace("\"\"", "\"");
-        }
-    }
-
+//    private static String getString(JsonValue badString) {
+//        try {
+//            return badString.asString();
+//        } catch (Exception var2) {
+//            return badString.toString().replace("\"\"", "\"");
+//        }
+//    }
     public Song getSong(String songID) {
-        String trackResponse = post("http://www." + Constants.dawnDotCom() + "/ajax/gw-light.php?api_version=1.0&api_token=" + apiToken + "&input=3", "[{\"method\":\"song.getListData\",\"params\":{\"sng_ids\":[" + songID + "]}}]", Arrays.asList(browserHeaders));
+        String trackResponse = post(
+                "http://www." + Constants.dawnDotCom() + "/ajax/gw-light.php?api_version=1.0&api_token=" + apiToken + "&input=3",
+                "[{\"method\":\"song.getListData\",\"params\":{\"sng_ids\":[" + songID + "]}}]", Arrays.asList(
+                        browserHeaders));
         if (trackResponse.equals("[{\"error\":{\"REQUEST_ERROR\":\"Wrong parameters\"},\"results\":{}}]")) {
             return null;
         } else {
-            JsonObject results = Json.parse(trackResponse).asArray().get(0).asObject().get("results").asObject();
-            if (results.getInt("count", 0) == 0) {
+            log.log(Level.INFO, trackResponse);
+            Response response = new Gson().fromJson(trackResponse, Response.class);
+            Results result = response.getResults();
+            // JsonObject results = Json.parse(trackResponse).asArray().get(0).asObject().get("results").asObject();
+            if (result.getCount() == 0) {
                 return null;
             } else {
-                JsonObject trackJson = results.get("data").asArray().get(0).asObject();
-                return songID.startsWith("-") ? this.parseUserTrack(trackJson) : this.parseTrack(trackJson);
+                // JsonObject trackJson = results.get("data").asArray().get(0).asObject();
+                // return songID.startsWith("-") ? this.parseUserTrack(trackJson) : this.parseTrack(trackJson);
+                return result.getTracks().get(0).toSong();
             }
         }
     }
 
-    private Song parseTrack(JsonObject trackJson) {
-        String songID = getString(trackJson.get("SNG_ID"));
-        String puid = getString(trackJson.get("MD5_ORIGIN"));
-        int format = Long.valueOf(getString(trackJson.get("FILESIZE_MP3_320"))) > 0L ? 3 : (Long.valueOf(getString(trackJson.get("FILESIZE_MP3_256"))) > 0L ? 5 : 1);
-        int mediaVersion = Integer.valueOf(getString(trackJson.get("MEDIA_VERSION")));
-        String mp3Url = Crypter.getDownloadURL(puid, format, songID, mediaVersion);
-        String title = trackJson.get("SNG_TITLE").asString();
-        String version = trackJson.getString("VERSION", "");
-        if (!version.equals("")) {
-            title = title + " " + version;
-        }
-
-        String album = trackJson.get("ALB_TITLE").asString();
-        ArtistList artists = new ArtistList();
-        artists.add(trackJson.get("ART_NAME").asString());
-        JsonArray js_artists = trackJson.get("ARTISTS").asArray();
-
-        int diskNumber;
-        String tmpArtist;
-        for (int i = 0; i < js_artists.size(); ++i) {
-            String artist = getString(js_artists.get(i).asObject().get("ART_NAME"));
-            if (artist.contains(" feat. ")) {
-                String[] var15 = artist.split(" feat. ");
-                int var16 = var15.length;
-
-                for (diskNumber = 0; diskNumber < var16; ++diskNumber) {
-                    tmpArtist = var15[diskNumber];
-                    if (!artists.contains(tmpArtist)) {
-                        artists.add(tmpArtist);
-                    }
-                }
-            } else if (!artists.contains(artist)) {
-                artists.add(artist);
-            }
-        }
-
-        String year = trackJson.getString("DIGITAL_RELEASE_DATE", "");
-        long duration = Long.parseLong(trackJson.getString("DURATION", "0"));
-        long trackNumber = Long.parseLong(trackJson.getString("TRACK_NUMBER", "0"));
-        diskNumber = Integer.parseInt(trackJson.getString("DISK_NUMBER", "0"));
-        tmpArtist = getString(trackJson.get("ISRC"));
-        String composer = getString(trackJson.get("COMPOSER"));
-        String bpm = getString(trackJson.get("BPM"));
-        Song s = new Song(songID, title, artists, album, duration, trackNumber, year);
-        s.setDownloadURL(mp3Url);
-        s.setDiskNumber(diskNumber);
-        s.setAlbumArtist((String) artists.get(0));
-        s.setISRC(tmpArtist);
-        s.setComposer(composer);
-        s.setBPM(bpm);
-        String coverURL = String.format("http://cdn-images." + Constants.dawnDotCom() + "/images/cover/%s/500x500-000000-80-0-0.jpg", trackJson.getString("ALB_PICTURE", ""));
-        s.setCoverURL(coverURL);
-        return s;
-    }
-
-    private Song parseUserTrack(JsonObject trackJson) {
-        String songID = getString(trackJson.get("SNG_ID"));
-        String puid = getString(trackJson.get("MD5_ORIGIN"));
-        int format = 0;
-        int mediaVersion = Integer.valueOf(getString(trackJson.get("MEDIA_VERSION")));
-        String mp3Url = Crypter.getDownloadURL(puid, format, songID.substring(1), mediaVersion);
-        String title = trackJson.get("SNG_TITLE").asString();
-        String album = trackJson.get("ALB_TITLE").asString();
-        ArtistList artists = new ArtistList();
-        artists.add(trackJson.get("ART_NAME").asString());
-        String year = "";
-        long duration = Long.parseLong(trackJson.getString("DURATION", "0"));
-        long trackNumber = Long.parseLong(trackJson.getString("TRACK_NUMBER", "0"));
-        int diskNumber = Integer.parseInt(trackJson.getString("DISK_NUMBER", "0"));
-        Song s = new Song(songID, title, artists, album, duration, trackNumber, year);
-        s.setDownloadURL(mp3Url);
-        s.setDiskNumber(diskNumber);
-        s.setAlbumArtist((String) artists.get(0));
-        String coverURL = String.format("http://cdn-images." + Constants.dawnDotCom() + "/images/cover/%s/500x500-000000-80-0-0.jpg", trackJson.getString("ALB_PICTURE", ""));
-        s.setCoverURL(coverURL);
-        return s;
-    }
-
+//    private Song parseTrack(JsonObject trackJson) {
+//        String songID = getString(trackJson.get("SNG_ID"));
+//        String puid = getString(trackJson.get("MD5_ORIGIN"));
+//        int format = Long.valueOf(getString(trackJson.get("FILESIZE_MP3_320"))) > 0L ? 3 : (Long.valueOf(getString(trackJson.get("FILESIZE_MP3_256"))) > 0L ? 5 : 1);
+//        int mediaVersion = Integer.valueOf(getString(trackJson.get("MEDIA_VERSION")));
+//        String mp3Url = Crypter.getDownloadURL(puid, format, songID, mediaVersion);
+//        String title = trackJson.get("SNG_TITLE").asString();
+//        String version = trackJson.getString("VERSION", "");
+//        if (!version.equals("")) {
+//            title = title + " " + version;
+//        }
+//
+//        String album = trackJson.get("ALB_TITLE").asString();
+//        ArtistList artists = new ArtistList();
+//        artists.add(trackJson.get("ART_NAME").asString());
+//        JsonArray js_artists = trackJson.get("ARTISTS").asArray();
+//
+//        int diskNumber;
+//        String tmpArtist;
+//        for (int i = 0; i < js_artists.size(); ++i) {
+//            String artist = getString(js_artists.get(i).asObject().get("ART_NAME"));
+//            if (artist.contains(" feat. ")) {
+//                String[] var15 = artist.split(" feat. ");
+//                int var16 = var15.length;
+//
+//                for (diskNumber = 0; diskNumber < var16; ++diskNumber) {
+//                    tmpArtist = var15[diskNumber];
+//                    if (!artists.contains(tmpArtist)) {
+//                        artists.add(tmpArtist);
+//                    }
+//                }
+//            } else if (!artists.contains(artist)) {
+//                artists.add(artist);
+//            }
+//        }
+//
+//        String year = trackJson.getString("DIGITAL_RELEASE_DATE", "");
+//        long duration = Long.parseLong(trackJson.getString("DURATION", "0"));
+//        long trackNumber = Long.parseLong(trackJson.getString("TRACK_NUMBER", "0"));
+//        diskNumber = Integer.parseInt(trackJson.getString("DISK_NUMBER", "0"));
+//        tmpArtist = getString(trackJson.get("ISRC"));
+//        String composer = getString(trackJson.get("COMPOSER"));
+//        String bpm = getString(trackJson.get("BPM"));
+//        Song s = new Song(songID, title, artists, album, duration, trackNumber, year);
+//        s.setDownloadURL(mp3Url);
+//        s.setDiskNumber(diskNumber);
+//        s.setAlbumArtist((String) artists.get(0));
+//        s.setISRC(tmpArtist);
+//        s.setComposer(composer);
+//        s.setBPM(bpm);
+//        String coverURL = String.format("http://cdn-images." + Constants.dawnDotCom() + "/images/cover/%s/500x500-000000-80-0-0.jpg", trackJson.getString("ALB_PICTURE", ""));
+//        s.setCoverURL(coverURL);
+//        return s;
+//    }
+//    private Song parseUserTrack(JsonObject trackJson) {
+//        String songID = getString(trackJson.get("SNG_ID"));
+//        String puid = getString(trackJson.get("MD5_ORIGIN"));
+//        int format = 0;
+//        int mediaVersion = Integer.valueOf(getString(trackJson.get("MEDIA_VERSION")));
+//        String mp3Url = Crypter.getDownloadURL(puid, format, songID.substring(1), mediaVersion);
+//        String title = trackJson.get("SNG_TITLE").asString();
+//        String album = trackJson.get("ALB_TITLE").asString();
+//        ArtistList artists = new ArtistList();
+//        artists.add(trackJson.get("ART_NAME").asString());
+//        String year = "";
+//        long duration = Long.parseLong(trackJson.getString("DURATION", "0"));
+//        long trackNumber = Long.parseLong(trackJson.getString("TRACK_NUMBER", "0"));
+//        int diskNumber = Integer.parseInt(trackJson.getString("DISK_NUMBER", "0"));
+//        Song s = new Song(songID, title, artists, album, duration, trackNumber, year);
+//        s.setDownloadURL(mp3Url);
+//        s.setDiskNumber(diskNumber);
+//        s.setAlbumArtist((String) artists.get(0));
+//        String coverURL = String.format("http://cdn-images." + Constants.dawnDotCom() + "/images/cover/%s/500x500-000000-80-0-0.jpg", trackJson.getString("ALB_PICTURE", ""));
+//        s.setCoverURL(coverURL);
+//        return s;
+//    }
     public HashMap getPlaylist(String pl) {
         HashMap songList = new HashMap();
         String searchResponse = get(pl, Arrays.asList(browserHeaders));
         if (searchResponse != null) {
-            JsonObject result = Json.parse(searchResponse).asObject();
-            JsonValue error = result.get("error");
+            log.log(Level.INFO, searchResponse);
+            SearchResponse response = new Gson().fromJson(searchResponse, SearchResponse.class);
+            com.didawn.json.Error error = response.getError();
             if (error != null) {
-                if (error.asObject().getInt("code", -1) == 4) {
+                if (error.getCode() == 4) {
                     try {
                         Thread.sleep(5000L);
                         return this.getPlaylist(pl);
-                    } catch (InterruptedException var18) {
-                        var18.printStackTrace();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
                     }
                 }
-
                 return songList;
             }
 
-            JsonArray tracks = result.get("tracks").asObject().get("data").asArray();
+            List<Data> tracks = response.getTracks().getData();
+
+            // JsonArray tracks = result.get("tracks").asObject().get("data").asArray();
             if (tracks.isEmpty()) {
                 return songList;
             }
 
-            for (int i = 0; i < tracks.size(); ++i) {
-                JsonObject track = tracks.get(i).asObject();
-                String id = track.get("id").toString();
-                String title = track.get("title").asString();
-                String album = track.get("album").asObject().get("title").asString();
-                ArtistList artists = new ArtistList();
-                artists.add(track.get("artist").asObject().get("name").asString());
-                long duration = track.getLong("duration", 0L);
-                String altSID = "";
-                if (track.get("alternative") != null) {
-                    altSID = getString(track.get("alternative").asObject().get("id"));
-                }
+            for (Data track : tracks) {
 
+                String id = track.getId();
+                String title = track.getTitle();
+                String album = track.getAlbum().getTitle();
+                ArtistList artists = new ArtistList();
+                artists.add(track.getArtist().getName());
+                long duration = track.getDuration();
+                String altSID = track.getAlternative() == null ? "" : track.getAlternative().getID();
+
+//            for (int i = 0; i < tracks.size(); ++i) {
+//                JsonObject track = tracks.get(i).asObject();
+//                String id = track.get("id").toString();
+//                String title = track.get("title").asString();
+//                String album = track.get("album").asObject().get("title").asString();
+//                ArtistList artists = new ArtistList();
+//                artists.add(track.get("artist").asObject().get("name").asString());
+//                long duration = track.getLong("duration", 0L);
+//                String altSID = "";
+//                if (track.get("alternative") != null) {
+//                    altSID = getString(track.get("alternative").asObject().get("id"));
+//                }
                 Song s = new Song(id, title, artists, album, duration, 0L, "");
                 s.setAlbumArtist((String) artists.get(0));
                 s.setAlternativeID(altSID);
-                String coverURL;
-                if (!track.get("album").asObject().get("cover_xl").isNull()) {
-                    coverURL = track.get("album").asObject().getString("cover_xl", "");
-                    s.setCoverURL(coverURL);
-                } else if (!track.get("album").asObject().get("cover_big").isNull()) {
-                    coverURL = track.get("album").asObject().getString("cover_big", "");
-                    s.setCoverURL(coverURL);
+
+                String coverXL = track.getAlbum().getCoverXL();
+                if (coverXL != null) {
+                    s.setCoverURL(coverXL);
+                } else {
+                    String coverBig = track.getAlbum().getCoverBig();
+                    if (coverBig != null) {
+                        s.setCoverURL(coverBig);
+                    }
                 }
 
+//                if (!track.get("album").asObject().get("cover_xl").isNull()) {
+//                    coverURL = track.get("album").asObject().getString("cover_xl", "");
+//                    s.setCoverURL(coverURL);
+//                } else if (!track.get("album").asObject().get("cover_big").isNull()) {
+//                    coverURL = track.get("album").asObject().getString("cover_big", "");
+//                    s.setCoverURL(coverURL);
+//                }
                 songList.put(id, s);
             }
 
@@ -393,36 +427,40 @@ public class Di {
         HashMap songList = new HashMap();
         String searchResponse = get(artistURL, Arrays.asList(browserHeaders));
         if (searchResponse != null) {
-            JsonObject result = Json.parse(searchResponse).asObject();
-            JsonValue error = result.get("error");
+            log.log(Level.INFO, searchResponse);
+            SearchResponse response = new Gson().fromJson(searchResponse, SearchResponse.class);
+            com.didawn.json.Error error = response.getError();
             if (error != null) {
-                if (error.asObject().getInt("code", -1) == 4) {
+                if (error.getCode() == 4) {
                     try {
                         Thread.sleep(5000L);
                         return this.getArtist(artistURL);
-                    } catch (InterruptedException var10) {
-                        var10.printStackTrace();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
                     }
                 }
 
                 return songList;
             }
 
-            JsonArray albums = result.get("data").asArray();
+//            JsonArray albums = response.get("data").asArray();
+            List<Data> albums = response.getData();
             if (albums.isEmpty()) {
                 return songList;
             }
 
-            for (int i = 0; i < albums.size(); ++i) {
-                JsonObject album = albums.get(i).asObject();
-                String link = album.getString("link", "");
+            for (Data album : albums) {
+                // JsonObject album = albums.get(i).asObject();
+                // String link = album.getString("link", "");
+                String link = album.getLink();
                 if (!link.equals("")) {
                     songList.putAll(this.getAlbum(link.replace("www.", "api.")));
                 }
             }
 
             songList = this.getExtraInfo(songList);
-            String next = result.getString("next", "");
+            // String next = result.getString("next", "");
+            String next = response.getNext();
             if (!next.equals("")) {
                 songList.putAll(this.getArtist(next));
             }
@@ -435,56 +473,97 @@ public class Di {
         HashMap songList = new HashMap();
         String searchResponse = get(pl + "/tracks?index=" + index, Arrays.asList(browserHeaders));
         if (searchResponse != null) {
-            JsonObject result = Json.parse(searchResponse).asObject();
-            JsonValue error = result.get("error");
+            log.log(Level.INFO, searchResponse);
+//            JsonObject result = Json.parse(searchResponse).asObject();
+//            JsonValue error = result.get("error");
+//            if (error != null) {
+//                if (error.asObject().getInt("code", -1) == 4) {
+//                    try {
+//                        Thread.sleep(5000L);
+//                        return this.getPlaylistTracks(pl, index);
+//                    } catch (InterruptedException var19) {
+//                        var19.printStackTrace();
+//                    }
+//                }
+//
+//                return songList;
+//            }
+
+            SearchResponse response = new Gson().fromJson(searchResponse, SearchResponse.class);
+            com.didawn.json.Error error = response.getError();
             if (error != null) {
-                if (error.asObject().getInt("code", -1) == 4) {
+                if (error.getCode() == 4) {
                     try {
                         Thread.sleep(5000L);
                         return this.getPlaylistTracks(pl, index);
-                    } catch (InterruptedException var19) {
-                        var19.printStackTrace();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
                     }
                 }
 
                 return songList;
             }
 
-            JsonArray tracks = result.get("data").asArray();
+//            JsonArray tracks = result.get("data").asArray();
+            List<Data> tracks = response.getData();
             if (tracks.isEmpty()) {
                 return songList;
             }
 
-            for (int i = 0; i < tracks.size(); ++i) {
-                JsonObject track = tracks.get(i).asObject();
-                String id = track.get("id").toString();
-                String title = track.get("title").asString();
-                String album = track.get("album").asObject().get("title").asString();
+//            for (int i = 0; i < tracks.size(); ++i) {
+//                JsonObject track = tracks.get(i).asObject();
+//                String id = track.get("id").toString();
+//                String title = track.get("title").asString();
+//                String album = track.get("album").asObject().get("title").asString();
+//                ArtistList artists = new ArtistList();
+//                artists.add(track.get("artist").asObject().get("name").asString());
+//                long duration = track.getLong("duration", 0L);
+//                String altSID = "";
+//                if (track.get("alternative") != null) {
+//                    altSID = getString(track.get("alternative").asObject().get("id"));
+//                }
+//
+//                Song s = new Song(id, title, artists, album, duration, 0L, "");
+//                s.setAlternativeID(altSID);
+//                s.setAlbumArtist((String) artists.get(0));
+//                String coverURL;
+//                if (!track.get("album").asObject().get("cover_xl").isNull()) {
+//                    coverURL = track.get("album").asObject().getString("cover_xl", "");
+//                    s.setCoverURL(coverURL);
+//                } else if (!track.get("album").asObject().get("cover_big").isNull()) {
+//                    coverURL = track.get("album").asObject().getString("cover_big", "");
+//                    s.setCoverURL(coverURL);
+//                }
+//
+//                songList.put(id, s);
+//            }
+            for (Data track : tracks) {
+                String id = track.getId();
+                String title = track.getTitle();
+                String album = track.getAlbum().getTitle();
                 ArtistList artists = new ArtistList();
-                artists.add(track.get("artist").asObject().get("name").asString());
-                long duration = track.getLong("duration", 0L);
-                String altSID = "";
-                if (track.get("alternative") != null) {
-                    altSID = getString(track.get("alternative").asObject().get("id"));
-                }
+                artists.add(track.getArtist().getName());
+                long duration = track.getDuration();
+                String altSID = track.getAlternative() == null ? "" : track.getAlternative().getID();
 
                 Song s = new Song(id, title, artists, album, duration, 0L, "");
                 s.setAlternativeID(altSID);
                 s.setAlbumArtist((String) artists.get(0));
-                String coverURL;
-                if (!track.get("album").asObject().get("cover_xl").isNull()) {
-                    coverURL = track.get("album").asObject().getString("cover_xl", "");
-                    s.setCoverURL(coverURL);
-                } else if (!track.get("album").asObject().get("cover_big").isNull()) {
-                    coverURL = track.get("album").asObject().getString("cover_big", "");
-                    s.setCoverURL(coverURL);
+                String coverXL = track.getAlbum().getCoverXL();
+                if (coverXL != null) {
+                    s.setCoverURL(coverXL);
+                } else {
+                    String coverBig = track.getAlbum().getCoverBig();
+                    if (coverBig != null) {
+                        s.setCoverURL(coverBig);
+                    }
                 }
 
                 songList.put(id, s);
             }
 
             songList = this.getExtraInfo(songList);
-            if (result.get("next") != null) {
+            if (response.getNext() != null) {
                 songList.putAll(this.getPlaylistTracks(pl, index + 25));
             }
         }
@@ -502,20 +581,27 @@ public class Di {
 
         IDs = IDs + "]}}]";
         IDs = IDs.replace(",]", "]");
-        String trackResponse = post("http://www." + Constants.dawnDotCom() + "/ajax/gw-light.php?api_version=1.0&api_token=" + apiToken + "&input=3&cid=" + RandomStringUtils.randomAlphanumeric(18).toLowerCase(), IDs, Arrays.asList(browserHeaders));
-        JsonArray tracks = Json.parse(trackResponse).asArray().get(0).asObject().get("results").asObject().get("data").asArray();
-        Iterator var5 = tracks.iterator();
+        String trackResponse = post(
+                "http://www." + Constants.dawnDotCom() + "/ajax/gw-light.php?api_version=1.0&api_token=" + apiToken + "&input=3&cid=" + RandomStringUtils.randomAlphanumeric(
+                18).toLowerCase(), IDs, Arrays.asList(browserHeaders));
 
-        while (var5.hasNext()) {
-            JsonValue trackJsonTmp = (JsonValue) var5.next();
-            JsonObject trackJson = trackJsonTmp.asObject();
-            String tmpID = getString(trackJson.get("SNG_ID"));
+        log.log(Level.INFO, trackResponse);
+        Response[] response = new Gson().fromJson(trackResponse, Response[].class);
+        List<Data> tracks = response[0].getResults().getData();
+        //        JsonArray tracks = Json.parse(trackResponse).asArray().get(0).asObject().get("results").asObject().get("data").asArray();
+        //        Iterator iterator = tracks.iterator();
+
+        for (Data track : tracks) {
+//            JsonValue trackJsonTmp = (JsonValue) iterator.next();
+//            JsonObject trackJson = trackJsonTmp.asObject();
+//            String tmpID = getString(trackJson.get("SNG_ID"))
+            String tmpID = track.getSongID();
             Song s2 = (Song) songList.get(tmpID);
             Song tmp;
             if (tmpID.startsWith("-")) {
-                tmp = this.parseUserTrack(trackJson);
+                tmp = track.toSong(); // this.parseUserTrack(trackJson);
             } else {
-                tmp = this.parseTrack(trackJson);
+                tmp = track.toSong(); // this.parseTrack(trackJson);
                 s2.setArtists(tmp.getArtists());
             }
 
@@ -537,60 +623,105 @@ public class Di {
 
         try {
             if (searchResponse != null) {
-                JsonObject result = Json.parse(searchResponse).asObject();
-                JsonValue error = result.get("error");
+                log.log(Level.INFO, searchResponse);
+
+                SearchResponse response = new Gson().fromJson(searchResponse, SearchResponse.class);
+                com.didawn.json.Error error = response.getError();
                 if (error != null) {
-                    if (error.asObject().getInt("code", -1) == 4) {
+                    if (error.getCode() == 4) {
                         try {
                             Thread.sleep(5000L);
                             return this.getAlbum(albumID);
-                        } catch (InterruptedException var21) {
-                            var21.printStackTrace();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
                         }
                     }
 
                     return songList;
                 }
 
-                String album = result.get("title").asString();
+//                JsonObject result = Json.parse(searchResponse).asObject();
+//                JsonValue error = result.get("error");
+//                if (error != null) {
+//                    if (error.asObject().getInt("code", -1) == 4) {
+//                        try {
+//                            Thread.sleep(5000L);
+//                            return this.getAlbum(albumID);
+//                        } catch (InterruptedException var21) {
+//                            var21.printStackTrace();
+//                        }
+//                    }
+//
+//                    return songList;
+//                }
+//                String album = result.get("title").asString();
+                String album = response.getTitle();
                 String genre = "";
-                if (result.get("genres").asObject().get("data").asArray().size() > 0) {
-                    genre = getString(result.get("genres").asObject().get("data").asArray().get(0).asObject().get("name"));
+                List<Data> data = response.getGenres().getData();
+                if (data != null && !data.isEmpty()) {
+                    genre = data.get(0).getName();
                 }
+//                if (result.get("genres").asObject().get("data").asArray().size() > 0) {
+//                    genre = getString(
+//                            result.get("genres").asObject().get("data").asArray().get(0).asObject().get("name"));
+//                }
+                String label = response.getLabel();
+//                String label = result.getString("label", "");
+//                String trackCount = getString(result.get("nb_tracks"));
+                String trackCount = response.getNbTracks();
 
-                String label = result.getString("label", "");
-                String trackCount = getString(result.get("nb_tracks"));
-                String albumArtist = result.get("artist").asObject().get("name").asString();
-                JsonArray tracks = result.get("tracks").asObject().get("data").asArray();
+//                String albumArtist = result.get("artist").asObject().get("name").asString();
+                String albumArtist = response.getArtist().getName();
+
+                List<Data> tracks = response.getTracks().getData();
+//                JsonArray tracks = result.get("tracks").asObject().get("data").asArray();
                 if (tracks.isEmpty()) {
                     return songList;
                 }
-
-                for (int i = 0; i < tracks.size(); ++i) {
-                    JsonObject track = tracks.get(i).asObject();
-                    String id = track.get("id").toString();
-                    String title = track.get("title").asString();
+                for (Data track : tracks) {
+                    String id = track.getId();
+                    String title = track.getTitle();
                     ArtistList artists = new ArtistList();
-                    artists.add(track.get("artist").asObject().get("name").asString());
-                    long duration = track.getLong("duration", 0L);
+                    artists.add(track.getArtist().getName());
+                    long duration = track.getDuration();
+                    Alternative alternative = track.getAlternative();
+
+//                for (int i = 0; i < tracks.size(); ++i) {
+//                    JsonObject track = tracks.get(i).asObject();
+//                    String id = track.get("id").toString();
+//                    String title = track.get("title").asString();
+//                    ArtistList artists = new ArtistList();
+//                    artists.add(track.get("artist").asObject().get("name").asString());
+//                    long duration = track.getLong("duration", 0L);
                     Song s = new Song(id, title, artists, album, duration, 0L, "");
-                    String coverURL;
-                    if (track.get("alternative") != null) {
-                        coverURL = getString(track.get("alternative").asObject().get("id"));
-                        s.setAlternativeID(coverURL);
+//                    String coverURL;
+//                    if (track.get("alternative") != null) {
+//                        coverURL = getString(track.get("alternative").asObject().get("id"));
+//                        s.setAlternativeID(coverURL);
+//                    }
+
+                    if (alternative != null) {
+                        s.setAlternativeID(alternative.getID());
                     }
 
                     s.setGenre(genre);
                     s.setLabel(label);
                     s.setAlbumTrackCount(trackCount);
                     s.setAlbumArtist(albumArtist);
-                    if (!result.get("cover_xl").isNull()) {
-                        coverURL = result.getString("cover_xl", "");
-                        s.setCoverURL(coverURL);
-                    } else if (!result.get("cover_big").isNull()) {
-                        coverURL = result.getString("cover_big", "");
-                        s.setCoverURL(coverURL);
+                    String coverXL = response.getCoverXL();
+                    String coverBig = response.getCoverBig();
+                    if (coverXL != null) {
+                        s.setCoverURL(coverXL);
+                    } else if (coverBig != null) {
+                        s.setCoverURL(coverBig);
                     }
+//                    if (!result.get("cover_xl").isNull()) {
+//                        coverURL = result.getString("cover_xl", "");
+//                        s.setCoverURL(coverURL);
+//                    } else if (!result.get("cover_big").isNull()) {
+//                        coverURL = result.getString("cover_big", "");
+//                        s.setCoverURL(coverURL);
+//                    }
 
                     songList.put(id, s);
                 }
@@ -606,7 +737,8 @@ public class Di {
         if (download(s, out, downloadListener)) {
             return true;
         } else {
-            return (s.getAlternativeID() != null || !s.getAlternativeID().equals(s.getId())) && (s = this.getSong(s.getAlternativeID())) != null ? download(s, out, downloadListener) : false;
+            return (s.getAlternativeID() != null || !s.getAlternativeID().equals(s.getId())) && (s = this.getSong(
+                    s.getAlternativeID())) != null ? download(s, out, downloadListener) : false;
         }
     }
 
@@ -620,51 +752,79 @@ public class Di {
         HashMap songList = new HashMap();
 
         try {
-            String searchResponse = get("http://api." + Constants.dawnDotCom() + "/search/track?q=" + URLEncoder.encode(query, "UTF-8"), Arrays.asList(browserHeaders));
+            String url = "http://api." + Constants.dawnDotCom() + "/search/track?q=" + URLEncoder.encode(query, "UTF-8");
+            String searchResponse = get(url, Arrays.asList(browserHeaders));
             if (searchResponse != null) {
-                JsonObject result = Json.parse(searchResponse).asObject();
-                JsonValue error = result.get("error");
+                log.log(Level.INFO, searchResponse);
+                SearchResponse sr = new Gson().fromJson(searchResponse, SearchResponse.class);
+                // JsonObject result = Json.parse(searchResponse).asObject();
+//                 JsonValue error = result.get("error");
+                com.didawn.json.Error error = sr.getError();
                 if (error != null) {
-                    if (error.asObject().getInt("code", -1) == 4) {
+//                    if (error.asObject().getInt("code", -1) == 4) {
+                    if (error.getCode() == 4) {
                         try {
                             Thread.sleep(5000L);
                             return this.searchTrack(query);
-                        } catch (InterruptedException var17) {
-                            var17.printStackTrace();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
                         }
                     }
 
                     return songList;
                 }
 
-                JsonArray tracks = result.get("data").asArray();
+                List<Data> tracks = sr.getData();
+                // JsonArray tracks = result.get("data").asArray();
                 if (tracks.isEmpty()) {
                     return songList;
                 }
 
-                for (int i = 0; i < tracks.size(); ++i) {
-                    JsonObject track = tracks.get(i).asObject();
-                    String id = track.get("id").toString();
-                    String title = track.get("title").asString();
-                    String album = track.get("album").asObject().get("title").asString();
+//                for (int i = 0; i < tracks.size(); ++i) {
+//                    JsonObject track = tracks.get(i).asObject();
+                for (Data track : tracks) {
+//                    String id = track.get("id").toString();
+//                    String title = track.get("title").asString();
+//                    String album = track.get("album").asObject().get("title").asString();
+//                    ArtistList artists = new ArtistList();
+//                    artists.add(track.get("artist").asObject().get("name").asString());
+//                    long duration = track.getLong("duration", 0L);
+//                    Song s = new Song(id, title, artists, album, duration, 0L, "");
+//                    String coverURL;
+//                    if (track.get("alternative") != null) {
+//                        coverURL = getString(track.get("alternative").asObject().get("id"));
+//                        s.setAlternativeID(coverURL);
+//                    }
+//
+//                    s.setAlbumArtist((String) artists.get(0));
+//                    JsonValue jsonAlbum = track.get("album");
+//                    JsonObject jsonAlbumObject = jsonAlbum.asObject();
+//                    coverURL = jsonAlbumObject.getString("cover_big", "");
+//                    s.setCoverURL(coverURL);
+//                    songList.put(id, s);
+                    String id = track.getId();
+                    String title = track.getTitle();
+                    String album = track.getAlbum().getTitle();
                     ArtistList artists = new ArtistList();
-                    artists.add(track.get("artist").asObject().get("name").asString());
-                    long duration = track.getLong("duration", 0L);
+                    artists.add(track.getArtist().getName());
+                    long duration = track.getDuration();
                     Song s = new Song(id, title, artists, album, duration, 0L, "");
                     String coverURL;
-                    if (track.get("alternative") != null) {
-                        coverURL = getString(track.get("alternative").asObject().get("id"));
+                    Alternative alternative = track.getAlternative();
+                    if (alternative != null) {
+                        coverURL = alternative.getID();
                         s.setAlternativeID(coverURL);
                     }
 
                     s.setAlbumArtist((String) artists.get(0));
-                    coverURL = track.get("album").asObject().getString("cover_big", "");
+                    com.didawn.json.Album albumJson = track.getAlbum();
+                    coverURL = albumJson.getCoverBig();
                     s.setCoverURL(coverURL);
                     songList.put(id, s);
                 }
             }
-        } catch (UnsupportedEncodingException var18) {
-            var18.printStackTrace();
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
         }
 
         return this.getExtraInfo(songList);
@@ -674,36 +834,46 @@ public class Di {
         HashMap songList = new HashMap();
 
         try {
-            String searchResponse = get("http://api." + Constants.dawnDotCom() + "/search/album?q=" + URLEncoder.encode(query, "UTF-8"), Arrays.asList(browserHeaders));
+            String url = "http://api." + Constants.dawnDotCom() + "/search/album?q=" + URLEncoder.encode(query, "UTF-8");
+            String searchResponse = get(url, Arrays.asList(browserHeaders));
             if (searchResponse != null) {
-                JsonObject result = Json.parse(searchResponse).asObject();
-                JsonValue error = result.get("error");
+                log.log(Level.INFO, searchResponse);
+//                JsonObject result = Json.parse(searchResponse).asObject();
+//                JsonValue error = result.get("error");
+//                if (error != null) {
+//                    if (error.asObject().getInt("code", -1) == 4) {
+                SearchResponse sr = new Gson().fromJson(searchResponse, SearchResponse.class);
+                Error error = sr.getError();
                 if (error != null) {
-                    if (error.asObject().getInt("code", -1) == 4) {
+                    if (error.getCode() == 4) {
                         try {
                             Thread.sleep(5000L);
                             return this.searchAlbum(query);
-                        } catch (InterruptedException var10) {
-                            var10.printStackTrace();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
                         }
                     }
 
                     return songList;
                 }
 
-                JsonArray tracks = result.get("data").asArray();
+                // JsonArray tracks = result.get("data").asArray();
+                List<Data> tracks = sr.getData();
                 if (tracks.isEmpty()) {
                     return songList;
                 }
 
-                for (int i = 0; i < tracks.size(); ++i) {
-                    JsonObject track = tracks.get(i).asObject();
-                    String id = track.get("id").toString();
+//                for (int i = 0; i < tracks.size(); ++i) {
+//                    JsonObject track = tracks.get(i).asObject();
+                for (Data track : tracks) {
+//                    String id = track.get("id").toString();
+//                    songList.putAll(this.getAlbum("http://api." + Constants.dawnDotCom() + "/album/" + id));
+                    String id = track.getId();
                     songList.putAll(this.getAlbum("http://api." + Constants.dawnDotCom() + "/album/" + id));
                 }
             }
-        } catch (UnsupportedEncodingException var11) {
-            var11.printStackTrace();
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
         }
 
         return songList;
@@ -732,7 +902,8 @@ public class Di {
                 p = Pattern.compile(re1 + re2 + re3 + re5 + re6 + re7, 34);
                 m = p.matcher(searchTerm);
                 if (m.find()) {
-                    trackList = this.getArtist("http://api." + Constants.dawnDotCom() + "/artist/" + m.group(5) + "/albums");
+                    trackList = this.getArtist(
+                            "http://api." + Constants.dawnDotCom() + "/artist/" + m.group(5) + "/albums");
                 } else {
                     re5 = "(track)";
                     re7 = "((-?)\\d+)";
