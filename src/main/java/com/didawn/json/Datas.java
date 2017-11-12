@@ -1,12 +1,10 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.didawn.json;
 
-import com.google.gson.annotations.SerializedName;
+import static java.util.Collections.unmodifiableList;
+
 import java.util.List;
+
+import com.google.gson.annotations.SerializedName;
 
 /**
  *
@@ -17,11 +15,19 @@ public class Datas {
     @SerializedName("data")
     private List<Data> data;
 
+    /**
+     *
+     * @return
+     */
     public List<Data> getData() {
-        return data;
+	return unmodifiableList(data);
     }
 
+    /**
+     *
+     * @param data
+     */
     public void setData(List<Data> data) {
-        this.data = data;
+	this.data = data;
     }
 }

@@ -1,12 +1,10 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.didawn.json;
 
-import com.google.gson.annotations.SerializedName;
+import static java.util.Collections.unmodifiableList;
+
 import java.util.List;
+
+import com.google.gson.annotations.SerializedName;
 
 /**
  *
@@ -23,27 +21,51 @@ public class Results {
     @SerializedName("count")
     private int count;
 
+    /**
+     *
+     * @return
+     */
     public List<Track> getTracks() {
-        return tracks;
+	return unmodifiableList(tracks);
     }
 
+    /**
+     *
+     * @param tracks
+     */
     public void setTracks(List<Track> tracks) {
-        this.tracks = tracks;
+	this.tracks = tracks;
     }
 
+    /**
+     *
+     * @return
+     */
     public List<Data> getData() {
-        return data;
+	return unmodifiableList(data);
     }
 
+    /**
+     *
+     * @param data
+     */
     public void setData(List<Data> data) {
-        this.data = data;
+	this.data = data;
     }
 
+    /**
+     *
+     * @return
+     */
     public int getCount() {
-        return count;
+	return count;
     }
 
+    /**
+     *
+     * @param count
+     */
     public void setCount(int count) {
-        this.count = count;
+	this.count = count;
     }
 }

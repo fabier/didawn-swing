@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.didawn.json;
 
 import com.google.gson.annotations.SerializedName;
@@ -22,27 +17,51 @@ public class Album {
     @SerializedName("cover_big")
     private String coverBig;
 
+    /**
+     *
+     * @return
+     */
     public String getTitle() {
-        return title;
+	return title;
     }
 
+    /**
+     *
+     * @param title
+     */
     public void setTitle(String title) {
-        this.title = title;
+	this.title = title;
     }
 
+    /**
+     *
+     * @return
+     */
     public String getCoverXL() {
-        return coverXL;
+	return coverXL;
     }
 
+    /**
+     *
+     * @param coverXL
+     */
     public void setCoverXL(String coverXL) {
-        this.coverXL = coverXL;
+	this.coverXL = coverXL;
     }
 
+    /**
+     *
+     * @return
+     */
     public String getCoverBig() {
-        return coverBig;
+	return coverBig;
     }
 
+    /**
+     *
+     * @param coverBig
+     */
     public void setCoverBig(String coverBig) {
-        this.coverBig = coverBig;
+	this.coverBig = coverBig;
     }
 }

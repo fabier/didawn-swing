@@ -1,44 +1,78 @@
 package com.didawn.utils;
 
-import com.didawn.models.Song;
+import static com.didawn.utils.FileNameCleaner.removeIllegalChars;
+
 import java.io.File;
 
+import com.didawn.models.Song;
+
+/**
+ *
+ * @author fabier
+ */
 public class SubdirectorySongDestinationGenerator implements SongDestinationGenerator {
 
     private File destinationFolder;
     private boolean createArtistSubdirectory;
     private boolean createAlbumSubdirectory;
 
+    /**
+     *
+     * @param destinationFolder
+     */
     public SubdirectorySongDestinationGenerator(File destinationFolder) {
-        this.destinationFolder = destinationFolder;
+	this.destinationFolder = destinationFolder;
     }
 
+    /**
+     *
+     * @return
+     */
+    @Override
     public File getDestinationFolder() {
-        return this.destinationFolder;
+	return this.destinationFolder;
     }
 
+    /**
+     *
+     * @param destinationFolder
+     */
     public void setDestinationFolder(File destinationFolder) {
-        this.destinationFolder = destinationFolder;
+	this.destinationFolder = destinationFolder;
     }
 
+    /**
+     *
+     * @param song
+     * @return
+     */
+    @Override
     public File getDestinationFolder(Song song) {
-        File destinationFolder = this.getDestinationFolder();
-        if (this.createArtistSubdirectory) {
-            destinationFolder = new File(destinationFolder, FileNameCleaner.removeIllegalChars(song.getAlbumArtist()));
-        }
+	File destFolder = this.getDestinationFolder();
+	if (this.createArtistSubdirectory) {
+	    destFolder = new File(destFolder, removeIllegalChars(song.getAlbumArtist()));
+	}
 
-        if (this.createAlbumSubdirectory) {
-            destinationFolder = new File(destinationFolder, FileNameCleaner.removeIllegalChars(song.getAlbum()));
-        }
+	if (this.createAlbumSubdirectory) {
+	    destFolder = new File(destFolder, removeIllegalChars(song.getAlbum()));
+	}
 
-        return destinationFolder;
+	return destFolder;
     }
 
+    /**
+     *
+     * @param createSubdirectory
+     */
     public void setCreateArtistSubdirectory(boolean createSubdirectory) {
-        this.createArtistSubdirectory = createSubdirectory;
+	this.createArtistSubdirectory = createSubdirectory;
     }
 
+    /**
+     *
+     * @param createSubdirectory
+     */
     public void setCreateAlbumSubdirectory(boolean createSubdirectory) {
-        this.createAlbumSubdirectory = createSubdirectory;
+	this.createAlbumSubdirectory = createSubdirectory;
     }
 }

@@ -25,3 +25,5 @@ hs_err_pid*
 /.project
 /.settings
 /nbactions.xml
+/nbproject/
+/nb-configuration.xml

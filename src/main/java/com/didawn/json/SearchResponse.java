@@ -1,12 +1,10 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package com.didawn.json;
 
-import com.google.gson.annotations.SerializedName;
+import static java.util.Collections.unmodifiableList;
+
 import java.util.List;
+
+import com.google.gson.annotations.SerializedName;
 
 /**
  *
@@ -47,91 +45,179 @@ public class SearchResponse {
     @SerializedName("error")
     private Error error;
 
+    /**
+     *
+     * @return
+     */
     public Datas getTracks() {
-        return tracks;
+	return tracks;
     }
 
+    /**
+     *
+     * @param tracks
+     */
     public void setTracks(Datas tracks) {
-        this.tracks = tracks;
+	this.tracks = tracks;
     }
 
+    /**
+     *
+     * @return
+     */
     public Datas getGenres() {
-        return genres;
+	return genres;
     }
 
+    /**
+     *
+     * @param genres
+     */
     public void setGenres(Datas genres) {
-        this.genres = genres;
+	this.genres = genres;
     }
 
+    /**
+     *
+     * @return
+     */
     public Artist getArtist() {
-        return artist;
+	return artist;
     }
 
+    /**
+     *
+     * @param artist
+     */
     public void setArtist(Artist artist) {
-        this.artist = artist;
+	this.artist = artist;
     }
 
+    /**
+     *
+     * @return
+     */
     public List<Data> getData() {
-        return data;
+	return unmodifiableList(data);
     }
 
+    /**
+     *
+     * @param data
+     */
     public void setData(List<Data> data) {
-        this.data = data;
+	this.data = data;
     }
 
+    /**
+     *
+     * @return
+     */
     public String getTitle() {
-        return title;
+	return title;
     }
 
+    /**
+     *
+     * @param title
+     */
     public void setTitle(String title) {
-        this.title = title;
+	this.title = title;
     }
 
+    /**
+     *
+     * @return
+     */
     public String getLabel() {
-        return label;
+	return label;
     }
 
+    /**
+     *
+     * @param label
+     */
     public void setLabel(String label) {
-        this.label = label;
+	this.label = label;
     }
 
+    /**
+     *
+     * @return
+     */
     public String getNbTracks() {
-        return nbTracks;
+	return nbTracks;
     }
 
+    /**
+     *
+     * @param nbTracks
+     */
     public void setNbTracks(String nbTracks) {
-        this.nbTracks = nbTracks;
+	this.nbTracks = nbTracks;
     }
 
+    /**
+     *
+     * @return
+     */
     public String getCoverBig() {
-        return coverBig;
+	return coverBig;
     }
 
+    /**
+     *
+     * @param coverBig
+     */
     public void setCoverBig(String coverBig) {
-        this.coverBig = coverBig;
+	this.coverBig = coverBig;
     }
 
+    /**
+     *
+     * @return
+     */
     public String getCoverXL() {
-        return coverXL;
+	return coverXL;
     }
 
+    /**
+     *
+     * @param coverXL
+     */
     public void setCoverXL(String coverXL) {
-        this.coverXL = coverXL;
+	this.coverXL = coverXL;
     }
 
+    /**
+     *
+     * @return
+     */
     public String getNext() {
-        return next;
+	return next;
     }
 
+    /**
+     *
+     * @param next
+     */
     public void setNext(String next) {
-        this.next = next;
+	this.next = next;
     }
 
+    /**
+     *
+     * @return
+     */
     public Error getError() {
-        return error;
+	return error;
     }
 
+    /**
+     *
+     * @param error
+     */
     public void setError(Error error) {
-        this.error = error;
+	this.error = error;
     }
 }
